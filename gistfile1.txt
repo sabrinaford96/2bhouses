@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House Points Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .house-card {
+            background-color: white;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .house-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-in-out;
+        }
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .score-change {
+            position: absolute;
+            font-size: 2.5rem;
+            font-weight: bold;
+            opacity: 0;
+            animation: fade-up 1s forwards;
+        }
+        @keyframes fade-up {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+        .log-item {
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-6xl mx-auto space-y-8">
+        <header class="text-center">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight">Classroom House Points</h1>
+            <p class="mt-2 text-xl text-gray-500">
+                Track your team's progress and cheer each other on!
+            </p>
+        </header>
+
+        <div id="loading" class="text-center text-gray-500 text-lg">Loading...</div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- House Cards will be injected here by JavaScript -->
+        </div>
+
+        <!-- Event Log -->
+        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-800">Recent Activity</h2>
+            <ul id="event-log" class="mt-4 space-y-2 text-gray-600">
+                <!-- Log entries will be added here -->
+            </ul>
+        </div>
+        
+        <div class="mt-8 text-center text-sm text-gray-400">
+            <p id="user-id-display"></p>
+        </div>
+    </div>
+
+    <!-- Member List Modal -->
+    <div id="member-modal" class="hidden modal-overlay">
+        <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-lg mx-4 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="modal-title" class="text-2xl font-bold text-gray-800"></h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-800 transition-all duration-200 text-3xl font-bold">&times;</button>
+            </div>
+            
+            <div id="members-list" class="max-h-64 overflow-y-auto">
+                <!-- Members will be injected here -->
+            </div>
+            
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-4 border-t">
+                <input type="text" id="new-member-name" placeholder="Enter new member's name" class="flex-grow p-2 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-blue-500 transition-colors">
+                <button onclick="addMember()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Add Member</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Award Points Modal -->
+    <div id="points-modal" class="hidden modal-overlay">
+        <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm mx-4 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-2xl font-bold text-gray-800">Award Points</h3>
+                <button onclick="closePointsModal()" class="text-gray-500 hover:text-gray-800 transition-all duration-200 text-3xl font-bold">&times;</button>
+            </div>
+            
+            <p class="text-lg text-gray-700">Awarding points to: <span id="award-member-name" class="font-bold"></span></p>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="points-amount" class="block text-sm font-medium text-gray-700">Points</label>
+                    <input type="number" id="points-amount" value="1" min="1" class="w-full p-2 mt-1 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="points-category" class="block text-sm font-medium text-gray-700">Category</label>
+                    <select id="points-category" class="w-full p-2 mt-1 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-blue-500">
+                        <option value="Participation">Participation</option>
+                        <option value="Teamwork">Teamwork</option>
+                        <option value="Homework">Homework</option>
+                        <option value="Extra Credit">Extra Credit</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="submitPoints()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors">Submit</button>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, updateDoc, setDoc, getDoc, collection, addDoc, deleteDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firebase debug log level
+        setLogLevel('debug');
+
+        // Global variables for Firebase configuration, provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? initialAuthToken : null;
+
+        // --- Firebase Initialization ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // --- DOM Elements ---
+        const dashboardEl = document.getElementById('dashboard');
+        const loadingEl = document.getElementById('loading');
+        const userIdDisplayEl = document.getElementById('user-id-display');
+        const eventLogEl = document.getElementById('event-log');
+        const memberModalEl = document.getElementById('member-modal');
+        const pointsModalEl = document.getElementById('points-modal');
+        const memberModalTitleEl = document.getElementById('modal-title');
+        const membersListEl = document.getElementById('members-list');
+        const newMemberInputEl = document.getElementById('new-member-name');
+        const awardMemberNameEl = document.getElementById('award-member-name');
+        const pointsAmountEl = document.getElementById('points-amount');
+        const pointsCategoryEl = document.getElementById('points-category');
+
+        let currentHouseName = '';
+        let currentMemberId = '';
+
+        const houses = [
+            { name: "Earth", color: "green-500", icon: "🌎" },
+            { name: "Air", color: "blue-300", icon: "🌬️" },
+            { name: "Fire", color: "red-500", icon: "🔥" },
+            { name: "Water", color: "blue-500", icon: "🌊" }
+        ];
+
+        // Function to create a house card element
+        function createHouseCard(house) {
+            const card = document.createElement('div');
+            card.className = `house-card relative overflow-hidden bg-${house.color} bg-opacity-10 p-6 rounded-3xl shadow-lg flex flex-col items-center text-center transition-all duration-300 transform hover:scale-105`;
+            card.onclick = () => showMembers(house.name);
+            card.innerHTML = `
+                <div class="text-4xl mb-2">${house.icon}</div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-1">${house.name}</h3>
+                <div class="text-6xl sm:text-7xl font-extrabold text-${house.color} score-display" id="score-${house.name.replace(/\s/g, '-')}">0</div>
+            `;
+            return card;
+        }
+        
+        // Log an event to the UI
+        function logEvent(message) {
+            const li = document.createElement('li');
+            li.className = 'log-item text-sm text-gray-500 p-2 border-b last:border-b-0 border-gray-100';
+            li.textContent = message;
+            eventLogEl.prepend(li);
+            if (eventLogEl.children.length > 10) {
+                eventLogEl.removeChild(eventLogEl.lastChild);
+            }
+        }
+
+        // --- Firebase Auth ---
+        let userId = null;
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                userIdDisplayEl.textContent = `Your User ID: ${userId}`;
+                dashboardEl.classList.remove('hidden');
+                loadingEl.classList.add('hidden');
+                
+                // Set up the listeners after auth is ready
+                setupListeners();
+            } else {
+                // If the initial token is not present, sign in anonymously.
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Error signing in:", error);
+                    loadingEl.textContent = "Error loading app. Please check your network.";
+                }
+            }
+        });
+
+        // --- Firestore Operations ---
+        
+        function showMembers(houseName) {
+            currentHouseName = houseName;
+            memberModalTitleEl.textContent = `${houseName} Members`;
+            memberModalEl.classList.remove('hidden');
+            membersListEl.innerHTML = '<div class="text-center text-gray-400">Loading members...</div>';
+            
+            const membersCollectionRef = collection(db, `/artifacts/${appId}/public/data/house_points/${houseName.replace(/\s/g, '-')}/members`);
+            
+            // Listen for real-time member updates
+            onSnapshot(membersCollectionRef, (snapshot) => {
+                membersListEl.innerHTML = '';
+                if (snapshot.empty) {
+                    membersListEl.innerHTML = '<div class="text-center text-gray-400 p-4">No members yet. Add the first one!</div>';
+                } else {
+                    snapshot.forEach(memberDoc => {
+                        const memberData = memberDoc.data();
+                        const memberItem = document.createElement('div');
+                        memberItem.className = 'flex justify-between items-center p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200';
+                        memberItem.innerHTML = `
+                            <span>${memberData.name}</span>
+                            <div class="space-x-2">
+                                <button onclick="showPointsModal('${memberDoc.id}', '${memberData.name}', '${houseName}')" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-full transition-colors">Award Points</button>
+                                <button onclick="deleteMember('${houseName.replace(/\s/g, '-')}', '${memberDoc.id}')" class="text-red-500 hover:text-red-700 transition-colors duration-200 font-bold">&times;</button>
+                            </div>
+                        `;
+                        membersListEl.appendChild(memberItem);
+                    });
+                }
+            });
+        }
+        
+        async function addMember() {
+            const name = newMemberInputEl.value.trim();
+            if (!name) {
+                newMemberInputEl.placeholder = "Name cannot be empty!";
+                newMemberInputEl.classList.add('border-red-500');
+                setTimeout(() => {
+                    newMemberInputEl.classList.remove('border-red-500');
+                    newMemberInputEl.placeholder = "Enter new member's name";
+                }, 1500);
+                return;
+            }
+
+            const membersCollectionRef = collection(db, `/artifacts/${appId}/public/data/house_points/${currentHouseName.replace(/\s/g, '-')}/members`);
+
+            try {
+                await addDoc(membersCollectionRef, {
+                    name: name,
+                    addedBy: userId,
+                    timestamp: new Date().toISOString()
+                });
+                newMemberInputEl.value = '';
+                logEvent(`New member '${name}' added to ${currentHouseName}`);
+            } catch (e) {
+                console.error("Error adding member: ", e);
+                logEvent(`Error adding member '${name}'`);
+            }
+        }
+
+        async function deleteMember(houseName, memberId) {
+            const memberDocRef = doc(db, `/artifacts/${appId}/public/data/house_points/${houseName}/members/${memberId}`);
+            try {
+                await deleteDoc(memberDocRef);
+                logEvent(`Member removed from ${houseName.replace(/-/g, ' ')}`);
+            } catch (e) {
+                console.error("Error deleting member: ", e);
+                logEvent(`Error removing member`);
+            }
+        }
+        
+        function showPointsModal(memberId, memberName, houseName) {
+            currentMemberId = memberId;
+            currentHouseName = houseName;
+            awardMemberNameEl.textContent = memberName;
+            pointsModalEl.classList.remove('hidden');
+        }
+
+        function closePointsModal() {
+            pointsModalEl.classList.add('hidden');
+        }
+
+        async function submitPoints() {
+            const points = parseInt(pointsAmountEl.value, 10);
+            const category = pointsCategoryEl.value;
+            const memberName = awardMemberNameEl.textContent;
+
+            if (isNaN(points) || points <= 0) {
+                pointsAmountEl.classList.add('border-red-500');
+                setTimeout(() => pointsAmountEl.classList.remove('border-red-500'), 1500);
+                return;
+            }
+
+            // Atomically update the house's total points
+            const houseDocRef = doc(db, `/artifacts/${appId}/public/data/house_points/${currentHouseName.replace(/\s/g, '-')}`);
+            
+            try {
+                // Use setDoc with merge: true to create the document if it doesn't exist
+                await setDoc(houseDocRef, {
+                    points: increment(points),
+                    lastUpdatedBy: userId,
+                    timestamp: new Date().toISOString()
+                }, { merge: true });
+                
+                // Add a new document to the activities subcollection
+                const activitiesCollectionRef = collection(db, `/artifacts/${appId}/public/data/house_points/${currentHouseName.replace(/\s/g, '-')}/activities`);
+                await addDoc(activitiesCollectionRef, {
+                    memberId: currentMemberId,
+                    memberName: memberName,
+                    points: points,
+                    category: category,
+                    addedBy: userId,
+                    timestamp: new Date().toISOString()
+                });
+
+                logEvent(`${memberName} received ${points} points for ${category} for ${currentHouseName}.`);
+                
+                closePointsModal();
+            } catch (e) {
+                console.error("Error awarding points: ", e);
+                logEvent(`Error awarding points to ${memberName}`);
+            }
+        }
+
+        function closeModal() {
+            memberModalEl.classList.add('hidden');
+        }
+
+        // --- Real-time Listener ---
+        function setupListeners() {
+            houses.forEach(house => {
+                const docPath = `/artifacts/${appId}/public/data/house_points/${house.name.replace(/\s/g, '-')}`;
+                const houseDocRef = doc(db, docPath);
+
+                // Set up initial dashboard structure
+                const houseCard = createHouseCard(house);
+                dashboardEl.appendChild(houseCard);
+                const scoreDisplay = document.getElementById(`score-${house.name.replace(/\s/g, '-')}`);
+
+                // Listen for real-time updates
+                onSnapshot(houseDocRef, (docSnap) => {
+                    const newPoints = docSnap.exists() ? docSnap.data().points : 0;
+                    
+                    if (scoreDisplay.textContent !== newPoints.toString()) {
+                        scoreDisplay.textContent = newPoints;
+                        scoreDisplay.classList.add('animate-pop');
+                        
+                        setTimeout(() => {
+                            scoreDisplay.classList.remove('animate-pop');
+                        }, 300);
+                    }
+                }, (error) => {
+                    console.error("Error listening to document: ", error);
+                    logEvent(`Error with live updates for ${house.name}`);
+                });
+            });
+        }
+        
+        // Expose functions to the global scope for onclick attributes
+        window.showMembers = showMembers;
+        window.addMember = addMember;
+        window.deleteMember = deleteMember;
+        window.closeModal = closeModal;
+        window.showPointsModal = showPointsModal;
+        window.closePointsModal = closePointsModal;
+        window.submitPoints = submitPoints;
+
+    </script>
+</body>
+</html>
